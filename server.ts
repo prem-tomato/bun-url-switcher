@@ -1,14 +1,13 @@
-// server.ts
-import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/vercel-postgres";
+import { migrate } from "drizzle-orm/vercel-postgres/migrator"; // Updated for vercel-postgres
+import { sql } from "@vercel/postgres"; // Vercel client
 import { cors } from "@elysiajs/cors";
 import { Elysia, t } from "elysia";
 import * as schema from "./db/schema";
 import { urlsTable } from "./db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm"; // Removed isNull as unused
 
-// Types
+// Types (unchanged)
 interface UrlItem {
   id: string;
   name: string;
@@ -16,20 +15,18 @@ interface UrlItem {
   subUrls: Record<string, string>;
 }
 
-// Database connection
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is required");
-}
+// Database connection (uses env.POSTGRES_URL automatically)
+const db = drizzle({ client: sql, schema });
 
-// Create postgres client
-const client = postgres(connectionString, { prepare: false });
-const db = drizzle(client, { schema });
-
-// Initialize database with seed data
+// Run migrations and initialize (call once on startup)
+let isInitialized = false;
 async function initializeDatabase() {
+  if (isInitialized) return;
   try {
-    console.log("🔄 Initializing database...");
+    console.log("🔄 Running migrations and initializing database...");
+
+    // Run migrations (assumes you have a drizzle folder with migration files)
+    await migrate(db, { migrationsFolder: "./drizzle" });
 
     // Check if we have any URLs already
     const existingUrls = await db.select().from(urlsTable).limit(1);
@@ -72,32 +69,36 @@ async function initializeDatabase() {
     } else {
       console.log("✅ Database already contains data, skipping seed");
     }
+
+    isInitialized = true;
   } catch (error) {
     console.error("❌ Database initialization failed:", error);
     throw error;
   }
 }
 
-// Helper functions
+// Helper functions (unchanged)
 function generateId(): string {
   return crypto.randomUUID();
 }
 
-// Create Elysia app
+// Create Elysia app (unchanged except call init)
 const app = new Elysia()
   .use(
     cors({
-      origin: true, // Allow all origins in development
+      origin: true,
       methods: ["GET", "POST", "PUT", "DELETE"],
       allowedHeaders: ["Content-Type", "Authorization"],
     })
   )
+  .onStart(async () => {
+    await initializeDatabase(); // Run on app start
+  })
 
-  // Health check
+  // Health check (updated to use new db)
   .get("/health", async () => {
     try {
-      // Test database connection
-      await db.select().from(urlsTable).limit(1);
+      await db.execute(`SELECT 1`); // Test connection
       return {
         status: "ok",
         timestamp: new Date().toISOString(),
