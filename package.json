@@ -11,10 +11,18 @@
     "clean": "rm -rf dist",
     "type-check": "bunx tsc --noEmit",
     "db:generate": "bunx drizzle-kit generate:pg",
-    "db:migrate": "bun run db/migrate.ts",
+    "migrate:prod": "bun run db/migrate.ts",
     "db:studio": "bunx drizzle-kit studio"
   },
-  "keywords": ["bun", "elysia", "postgresql", "neon", "drizzle", "api", "url-switcher"],
+  "keywords": [
+    "bun",
+    "elysia",
+    "postgresql",
+    "neon",
+    "drizzle",
+    "api",
+    "url-switcher"
+  ],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
