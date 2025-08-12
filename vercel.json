@@ -1,11 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server.ts",
-      "use": "@vercel/node@3"
+  "functions": {
+    "server.ts": {
+      "runtime": "nodejs20.x"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/(.*)",
