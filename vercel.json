@@ -1,15 +1,14 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server.ts",
-      "use": "@vercel/edge"
+  "functions": {
+    "api/[[...path]].ts": {
+      "runtime": "@vercel/edge@1"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/server.ts"
+      "source": "/(.*)",
+      "destination": "/api"
     }
   ]
 }

@@ -3,8 +3,8 @@ import { migrate } from "drizzle-orm/vercel-postgres/migrator"; // Updated for v
 import { sql } from "@vercel/postgres"; // Vercel client
 import { cors } from "@elysiajs/cors";
 import { Elysia, t } from "elysia";
-import * as schema from "./db/schema";
-import { urlsTable } from "./db/schema";
+import * as schema from "../db/schema";
+import { urlsTable } from "../db/schema";
 import { eq, and } from "drizzle-orm"; // Removed isNull as unused
 
 // Types (unchanged)
