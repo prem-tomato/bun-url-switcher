@@ -1,12 +1,11 @@
 // server.ts
 import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { cors } from "@elysiajs/cors";
 import { Elysia, t } from "elysia";
 import * as schema from "./db/schema";
 import { urlsTable } from "./db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 // Types
 interface UrlItem {
@@ -26,54 +25,16 @@ if (!connectionString) {
 const client = postgres(connectionString, { prepare: false });
 const db = drizzle(client, { schema });
 
-// Initialize database with seed data
 async function initializeDatabase() {
   try {
-    console.log("🔄 Initializing database...");
+    console.log("🔄 Connecting to database...");
 
-    // Check if we have any URLs already
-    const existingUrls = await db.select().from(urlsTable).limit(1);
+    // Use postgres.js client directly for test query
+    await client`SELECT 1`;
 
-    if (existingUrls.length === 0) {
-      console.log("📦 Seeding database with initial data...");
-
-      const initialData: Omit<UrlItem, "id">[] = [
-        {
-          name: "BBC News",
-          mainUrl: "https://www.bbc.com",
-          subUrls: {
-            us: "https://www.bbc.com/news/world/us_and_canada",
-            uk: "https://www.bbc.co.uk",
-            in: "https://www.bbc.com/news/world/asia/india",
-          },
-        },
-        {
-          name: "Google",
-          mainUrl: "https://www.google.com",
-          subUrls: {
-            in: "https://www.google.co.in",
-            uk: "https://www.google.co.uk",
-            jp: "https://www.google.co.jp",
-          },
-        },
-      ];
-
-      for (const item of initialData) {
-        await db.insert(urlsTable).values({
-          id: crypto.randomUUID(),
-          name: item.name,
-          mainUrl: item.mainUrl,
-          subUrls: item.subUrls,
-          isDeleted: false,
-        });
-      }
-
-      console.log("✅ Database seeded successfully!");
-    } else {
-      console.log("✅ Database already contains data, skipping seed");
-    }
+    console.log("✅ Database connection successful");
   } catch (error) {
-    console.error("❌ Database initialization failed:", error);
+    console.error("❌ Database connection failed:", error);
     throw error;
   }
 }
@@ -333,10 +294,7 @@ const app = new Elysia()
     };
   });
 
-  if (process.env.VERCEL !== "1") {
-    app.listen(Number(process.env.PORT) || 3002);
-    console.log(`🚀 Server running at http://localhost:${process.env.PORT || 3002}`);
-  }
-  
-  export default app.fetch;
-  
+await initializeDatabase();
+
+// Just export the app for Vercel to handle
+export default app;
