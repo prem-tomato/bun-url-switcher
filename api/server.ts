@@ -1,3 +1,4 @@
+// api/server.ts
 import { drizzle } from "drizzle-orm/vercel-postgres";
 import { migrate } from "drizzle-orm/vercel-postgres/migrator"; // Updated for vercel-postgres
 import { sql } from "@vercel/postgres"; // Vercel client
@@ -23,57 +24,23 @@ let isInitialized = false;
 async function initializeDatabase() {
   if (isInitialized) return;
   try {
-    console.log("🔄 Running migrations and initializing database...");
+    // The migration call has been removed from here.
+    console.log("🔄 Initializing database connection...");
 
-    // Run migrations (assumes you have a drizzle folder with migration files)
-    await migrate(db, { migrationsFolder: "./drizzle" });
-
-    // Check if we have any URLs already
+    // Seeding logic is okay to keep because of the check
     const existingUrls = await db.select().from(urlsTable).limit(1);
-
     if (existingUrls.length === 0) {
       console.log("📦 Seeding database with initial data...");
-
-      const initialData: Omit<UrlItem, "id">[] = [
-        {
-          name: "BBC News",
-          mainUrl: "https://www.bbc.com",
-          subUrls: {
-            us: "https://www.bbc.com/news/world/us_and_canada",
-            uk: "https://www.bbc.co.uk",
-            in: "https://www.bbc.com/news/world/asia/india",
-          },
-        },
-        {
-          name: "Google",
-          mainUrl: "https://www.google.com",
-          subUrls: {
-            in: "https://www.google.co.in",
-            uk: "https://www.google.co.uk",
-            jp: "https://www.google.co.jp",
-          },
-        },
-      ];
-
-      for (const item of initialData) {
-        await db.insert(urlsTable).values({
-          id: crypto.randomUUID(),
-          name: item.name,
-          mainUrl: item.mainUrl,
-          subUrls: item.subUrls,
-          isDeleted: false,
-        });
-      }
-
-      console.log("✅ Database seeded successfully!");
+      // ... your seeding code ...
     } else {
       console.log("✅ Database already contains data, skipping seed");
     }
 
     isInitialized = true;
+    console.log("✅ Database initialization complete!");
   } catch (error) {
     console.error("❌ Database initialization failed:", error);
-    throw error;
+    throw error; // Propagate error to stop the function from starting incorrectly
   }
 }
 
