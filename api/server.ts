@@ -341,7 +341,7 @@ if (process.env.VERCEL !== "1") {
   );
 }
 export const config = {
-  runtime: "edge",
+  runtime: "nodejs",
 };
 
 // Your types, db setup, initializeDatabase, app definition...
