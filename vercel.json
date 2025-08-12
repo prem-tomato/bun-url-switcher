@@ -1,17 +1,15 @@
 {
   "version": 2,
-  "functions": {
-    "server.ts": {
-      "runtime": "edge"
+  "builds": [
+    {
+      "src": "server.ts",
+      "use": "@vercel/node@3"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/(.*)",
       "dest": "/server.ts"
     }
-  ],
-  "env": {
-    "RUNTIME": "edge"
-  }
+  ]
 }

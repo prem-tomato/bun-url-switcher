@@ -280,5 +280,28 @@ const app = new Elysia()
     };
   });
 
-// Export for Vercel Edge Functions
-export default app;
+// Export for Vercel - Node.js runtime
+export default async function handler(req: any, res: any) {
+  try {
+    const url = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}${req.url}`;
+    
+    const request = new Request(url, {
+      method: req.method,
+      headers: req.headers,
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
+    });
+
+    const response = await app.handle(request);
+    const responseData = await response.text();
+    
+    // Set response headers
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+    
+    res.status(response.status).send(responseData);
+  } catch (error) {
+    console.error('Handler error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
