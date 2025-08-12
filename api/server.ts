@@ -1,55 +1,47 @@
-// api/server.ts
-import { drizzle } from "drizzle-orm/vercel-postgres";
-import { migrate } from "drizzle-orm/vercel-postgres/migrator"; // Updated for vercel-postgres
-import { sql } from "@vercel/postgres"; // Vercel client
+import { sql } from "@vercel/postgres";
 import { cors } from "@elysiajs/cors";
 import { Elysia, t } from "elysia";
-import * as schema from "../db/schema";
-import { urlsTable } from "../db/schema";
-import { eq, and } from "drizzle-orm"; // Removed isNull as unused
 
-// Types (unchanged)
+// Types
 interface UrlItem {
   id: string;
   name: string;
   mainUrl: string;
   subUrls: Record<string, string>;
+  isDeleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
 }
 
-// Database connection (uses env.POSTGRES_URL automatically)
-const db = drizzle({ client: sql, schema });
+interface CreateUrlData {
+  name: string;
+  mainUrl: string;
+  subUrls?: Record<string, string>;
+}
 
-// Run migrations and initialize (call once on startup)
-let isInitialized = false;
-async function initializeDatabase() {
-  if (isInitialized) return;
+interface UpdateUrlData {
+  name: string;
+  mainUrl: string;
+  subUrls?: Record<string, string>;
+}
+
+// Simple database connection test
+async function testDatabaseConnection() {
   try {
-    // The migration call has been removed from here.
-    console.log("🔄 Initializing database connection...");
-
-    // Seeding logic is okay to keep because of the check
-    const existingUrls = await db.select().from(urlsTable).limit(1);
-    if (existingUrls.length === 0) {
-      console.log("📦 Seeding database with initial data...");
-      // ... your seeding code ...
-    } else {
-      console.log("✅ Database already contains data, skipping seed");
-    }
-
-    isInitialized = true;
-    console.log("✅ Database initialization complete!");
+    await sql`SELECT 1`;
+    console.log("✅ Database connection successful");
   } catch (error) {
-    console.error("❌ Database initialization failed:", error);
-    throw error; // Propagate error to stop the function from starting incorrectly
+    console.error("❌ Database connection failed:", error);
   }
 }
 
-// Helper functions (unchanged)
+// Helper functions
 function generateId(): string {
   return crypto.randomUUID();
 }
 
-// Create Elysia app (unchanged except call init)
+// Create Elysia app
 const app = new Elysia()
   .use(
     cors({
@@ -59,13 +51,13 @@ const app = new Elysia()
     })
   )
   .onStart(async () => {
-    await initializeDatabase(); // Run on app start
+    await testDatabaseConnection();
   })
 
-  // Health check (updated to use new db)
+  // Health check
   .get("/health", async () => {
     try {
-      await db.execute(`SELECT 1`); // Test connection
+      await sql`SELECT 1`;
       return {
         status: "ok",
         timestamp: new Date().toISOString(),
@@ -84,14 +76,16 @@ const app = new Elysia()
   // Get all URLs (only non-deleted)
   .get("/api/urls", async () => {
     try {
-      const urls = await db
-        .select()
-        .from(urlsTable)
-        .where(eq(urlsTable.isDeleted, false))
-        .orderBy(urlsTable.name);
+      const result = await sql`
+        SELECT id, name, "mainUrl", "subUrls", "isDeleted", "createdAt", "updatedAt", "deletedAt"
+        FROM urls 
+        WHERE "isDeleted" = false 
+        ORDER BY name ASC
+      `;
+
       return {
         success: true,
-        data: urls,
+        data: result.rows,
       };
     } catch (error) {
       console.error("Error fetching URLs:", error);
@@ -105,13 +99,14 @@ const app = new Elysia()
   // Get single URL by ID (only non-deleted)
   .get("/api/urls/:id", async ({ params: { id } }) => {
     try {
-      const urls = await db
-        .select()
-        .from(urlsTable)
-        .where(and(eq(urlsTable.id, id), eq(urlsTable.isDeleted, false)))
-        .limit(1);
+      const result = await sql`
+        SELECT id, name, "mainUrl", "subUrls", "isDeleted", "createdAt", "updatedAt", "deletedAt"
+        FROM urls 
+        WHERE id = ${id} AND "isDeleted" = false
+        LIMIT 1
+      `;
 
-      if (urls.length === 0) {
+      if (result.rows.length === 0) {
         return {
           success: false,
           error: "URL not found",
@@ -120,7 +115,7 @@ const app = new Elysia()
 
       return {
         success: true,
-        data: urls[0],
+        data: result.rows[0],
       };
     } catch (error) {
       console.error("Error fetching URL:", error);
@@ -136,15 +131,7 @@ const app = new Elysia()
     "/api/urls",
     async ({ body }) => {
       try {
-        const {
-          name,
-          mainUrl,
-          subUrls = {},
-        } = body as {
-          name: string;
-          mainUrl: string;
-          subUrls?: Record<string, string>;
-        };
+        const { name, mainUrl, subUrls = {} } = body as CreateUrlData;
 
         if (!name || !mainUrl) {
           return {
@@ -154,19 +141,18 @@ const app = new Elysia()
         }
 
         const id = generateId();
-        const newUrl = {
-          id,
-          name,
-          mainUrl,
-          subUrls,
-          isDeleted: false,
-        };
 
-        await db.insert(urlsTable).values(newUrl);
+        const result = await sql`
+          INSERT INTO urls (id, name, "mainUrl", "subUrls", "isDeleted", "createdAt", "updatedAt")
+          VALUES (${id}, ${name}, ${mainUrl}, ${JSON.stringify(
+          subUrls
+        )}, false, ()NOW, ()NOW)
+          RETURNING id, name, "mainUrl", "subUrls", "isDeleted", "createdAt", "updatedAt", "deletedAt"
+        `;
 
         return {
           success: true,
-          data: newUrl,
+          data: result.rows[0],
         };
       } catch (error) {
         console.error("Error creating URL:", error);
@@ -190,15 +176,7 @@ const app = new Elysia()
     "/api/urls/:id",
     async ({ params: { id }, body }) => {
       try {
-        const {
-          name,
-          mainUrl,
-          subUrls = {},
-        } = body as {
-          name: string;
-          mainUrl: string;
-          subUrls?: Record<string, string>;
-        };
+        const { name, mainUrl, subUrls = {} } = body as UpdateUrlData;
 
         if (!name || !mainUrl) {
           return {
@@ -208,38 +186,35 @@ const app = new Elysia()
         }
 
         // Check if URL exists and is not deleted
-        const existing = await db
-          .select()
-          .from(urlsTable)
-          .where(and(eq(urlsTable.id, id), eq(urlsTable.isDeleted, false)))
-          .limit(1);
-        if (existing.length === 0) {
+        const checkResult = await sql`
+          SELECT id FROM urls 
+          WHERE id = ${id} AND "isDeleted" = false
+          LIMIT 1
+        `;
+
+        if (checkResult.rows.length === 0) {
           return {
             success: false,
             error: "URL not found",
           };
         }
 
-        const updatedUrl = {
-          id,
-          name,
-          mainUrl,
-          subUrls,
-        };
+        const now = new Date();
 
-        await db
-          .update(urlsTable)
-          .set({
-            name,
-            mainUrl,
-            subUrls,
-            updatedAt: new Date(),
-          })
-          .where(eq(urlsTable.id, id));
+        const result = await sql`
+          UPDATE urls 
+          SET 
+            name = ${name},
+            "mainUrl" = ${mainUrl},
+            "subUrls" = ${JSON.stringify(subUrls)},
+            "updatedAt" = ()NOW
+          WHERE id = ${id}
+          RETURNING id, name, "mainUrl", "subUrls", "isDeleted", "createdAt", "updatedAt", "deletedAt"
+        `;
 
         return {
           success: true,
-          data: updatedUrl,
+          data: result.rows[0],
         };
       } catch (error) {
         console.error("Error updating URL:", error);
@@ -258,17 +233,26 @@ const app = new Elysia()
     }
   )
 
-  // Delete URL
+  // Delete URL (soft delete)
   .delete("/api/urls/:id", async ({ params: { id } }) => {
     try {
-      // soft delete
-      await db
-        .update(urlsTable)
-        .set({
-          isDeleted: true,
-          deletedAt: new Date(),
-        })
-        .where(eq(urlsTable.id, id));
+      const now = new Date();
+
+      const result = await sql`
+        UPDATE urls 
+        SET 
+          "isDeleted" = true,
+          "deletedAt" = ()NOW
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: "URL not found",
+        };
+      }
 
       return {
         success: true,
@@ -283,7 +267,7 @@ const app = new Elysia()
     }
   })
 
-  // Handle 404
+  // Handle 404 and errors
   .onError(({ code, error, set }) => {
     if (code === "NOT_FOUND") {
       set.status = 404;
@@ -301,13 +285,13 @@ const app = new Elysia()
     };
   });
 
-if (process.env.VERCEL !== "1") {
+// For local development
+if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
   app.listen(Number(process.env.PORT) || 3002);
   console.log(
     `🚀 Server running at http://localhost:${process.env.PORT || 3002}`
   );
 }
 
-// Your types, db setup, initializeDatabase, app definition...
-
+// Export for Vercel (using Node.js adapter)
 export default app.fetch;
