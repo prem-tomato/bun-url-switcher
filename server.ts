@@ -25,20 +25,6 @@ if (!connectionString) {
 const client = postgres(connectionString, { prepare: false });
 const db = drizzle(client, { schema });
 
-async function initializeDatabase() {
-  try {
-    console.log("🔄 Connecting to database...");
-
-    // Use postgres.js client directly for test query
-    await client`SELECT 1`;
-
-    console.log("✅ Database connection successful");
-  } catch (error) {
-    console.error("❌ Database connection failed:", error);
-    throw error;
-  }
-}
-
 // Helper functions
 function generateId(): string {
   return crypto.randomUUID();
@@ -294,7 +280,5 @@ const app = new Elysia()
     };
   });
 
-await initializeDatabase();
-
-// Just export the app for Vercel to handle
+// Export for Vercel Edge Functions
 export default app;
