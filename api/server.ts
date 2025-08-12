@@ -340,9 +340,6 @@ if (process.env.VERCEL !== "1") {
     `🚀 Server running at http://localhost:${process.env.PORT || 3002}`
   );
 }
-export const config = {
-  runtime: "nodejs",
-};
 
 // Your types, db setup, initializeDatabase, app definition...
 
