@@ -1,10 +1,5 @@
 {
   "version": 2,
-  "functions": {
-    "api/[[...path]].ts": {
-      "runtime": "@vercel/edge@1"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
